@@ -19,24 +19,31 @@ const bip32 = BIP32Factory(ecc);
 initEccLib(ecc);
 
 export const NETWORK = true ? bitcoin.networks.testnet : bitcoin.networks.bitcoin;
-export const DEFAULT_DERIV_PATH = "m/86'/1'/0'/0/0";
-
+export const TESTNET_DERIV_PATH = "m/86'/1'/0'/0/0";
+export const MAINNET_DERIV_PATH = "m/86'/0'/0'/0/0";
 const TEST_MNE_1 =
   'open jelly jeans corn ketchup supreme brief element armed lens vault weather original scissors rug priority vicious lesson raven spot gossip powder person volcano';
 
+export const mnemonicToTaprootPrivateKey = async (mnemonic: string, testnet?) => {
+  const seed = bip39.mnemonicToSeedSync(mnemonic);
+  const rootKey = await bip32.fromSeed(
+    seed,
+    testnet ? bitcoin.networks.testnet : bitcoin.networks.bitcoin
+  );
+  const derivePath = testnet ? TESTNET_DERIV_PATH : MAINNET_DERIV_PATH;
+  const taprootChild = rootKey.derivePath(derivePath);
+
+  const privateKey = taprootChild.privateKey!;
+  return privateKey;
+};
 describe('Sign msg Tx', async () => {
   it('create signed raw tc tx', async () => {
-    const seed = bip39.mnemonicToSeedSync(TEST_MNE_1);
-    const rootKey = await bip32.fromSeed(seed, NETWORK);
-    const taprootChild = rootKey.derivePath(DEFAULT_DERIV_PATH);
-
-    const privateKey = taprootChild.privateKey!;
-  
-  
-    setBTCNetwork(NetworkType.Testnet);
+    const isTestNet = true;
+    const privateKey = await mnemonicToTaprootPrivateKey(TEST_MNE_1, isTestNet);
+    setBTCNetwork(isTestNet ? NetworkType.Testnet : NetworkType.Mainnet);
 
     const { senderAddress, keyPair } = generateTaprootKeyPair(privateKey);
-    console.log(senderAddress)
+
     assert(senderAddress == 'tb1p5hwep2dna6wjhk6atjh0uyjmmp095y2arz3z32c9udmde7qrgwrseypr8x');
 
     const utxos = await getUtxos(senderAddress);
