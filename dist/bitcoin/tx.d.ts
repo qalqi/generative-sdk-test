@@ -119,35 +119,6 @@ declare const createRawTx: ({ pubKey, utxos, inscriptions, sendInscriptionID, re
     isUseInscriptionPayFeeParam: boolean;
 }) => ICreateRawTxResp;
 /**
-* createTxFromAnyWallet creates the raw Bitcoin transaction (including sending inscriptions), but don't sign tx.
-* NOTE: Currently, the function only supports sending from Taproot address.
-* @param pubKey buffer public key of the sender (It is the internal pubkey for Taproot address)
-* @param utxos list of utxos (include non-inscription and inscription utxos)
-* @param inscriptions list of inscription infos of the sender
-* @param sendInscriptionID id of inscription to send
-* @param receiverInsAddress the address of the inscription receiver
-* @param sendAmount satoshi amount need to send
-* @param feeRatePerByte fee rate per byte (in satoshi)
-* @param isUseInscriptionPayFee flag defines using inscription coin to pay fee
-* @returns the transaction id
-* @returns the hex signed transaction
-* @returns the network fee
-*/
-declare const createTxFromAnyWallet: ({ pubKey, utxos, inscriptions, sendInscriptionID, receiverInsAddress, sendAmount, feeRatePerByte, isUseInscriptionPayFeeParam, walletType, cancelFn, }: {
-    pubKey: Buffer;
-    utxos: UTXO[];
-    inscriptions: {
-        [key: string]: Inscription[];
-    };
-    sendInscriptionID: string;
-    receiverInsAddress: string;
-    sendAmount: BigNumber;
-    feeRatePerByte: number;
-    isUseInscriptionPayFeeParam: boolean;
-    walletType?: number;
-    cancelFn: () => void;
-}) => Promise<ICreateTxResp>;
-/**
 * createTx creates the Bitcoin transaction (including sending inscriptions).
 * NOTE: Currently, the function only supports sending from Taproot address.
 * @param senderPrivateKey buffer private key of the sender
@@ -316,4 +287,4 @@ declare const createRawTxToPrepareUTXOsToBuyMultiInscs: ({ pubKey, address, utxo
     indicesToSign: number[];
 };
 declare const broadcastTx: (txHex: string) => Promise<string>;
-export { selectUTXOs, createTx, createRawTx, createTxFromAnyWallet, broadcastTx, createTxWithSpecificUTXOs, createRawTxDummyUTXOForSale, createTxSplitFundFromOrdinalUTXO, createRawTxSplitFundFromOrdinalUTXO, createDummyUTXOFromCardinal, createRawTxDummyUTXOFromCardinal, createTxSendBTC, createRawTxSendBTC, prepareUTXOsToBuyMultiInscriptions, createRawTxToPrepareUTXOsToBuyMultiInscs, signPSBT, signPSBT2, };
+export { selectUTXOs, createTx, createRawTx, broadcastTx, createTxWithSpecificUTXOs, createRawTxDummyUTXOForSale, createTxSplitFundFromOrdinalUTXO, createRawTxSplitFundFromOrdinalUTXO, createDummyUTXOFromCardinal, createRawTxDummyUTXOFromCardinal, createTxSendBTC, createRawTxSendBTC, prepareUTXOsToBuyMultiInscriptions, createRawTxToPrepareUTXOsToBuyMultiInscs, signPSBT, signPSBT2, };

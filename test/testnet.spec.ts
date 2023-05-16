@@ -36,7 +36,7 @@ describe('Sign msg Tx', async () => {
     setBTCNetwork(NetworkType.Testnet);
 
     const { senderAddress, keyPair } = generateTaprootKeyPair(privateKey);
-
+    console.log(senderAddress)
     assert(senderAddress == 'tb1p5hwep2dna6wjhk6atjh0uyjmmp095y2arz3z32c9udmde7qrgwrseypr8x');
 
     const utxos = await getUtxos(senderAddress);

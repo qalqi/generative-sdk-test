@@ -9,7 +9,6 @@ import { filterAndSortCardinalUTXOs, findExactValueUTXO, selectInscriptionUTXO, 
 
 import BigNumber from "bignumber.js";
 import { Network } from "./network";
-import { handleSignPsbtWithSpecificWallet } from "./xverse";
 
 /**
 * createTx creates the Bitcoin transaction (including sending inscriptions). 
@@ -417,79 +416,7 @@ const createRawTx = ({
     return { base64Psbt: psbt.toBase64(), fee: feeRes, changeAmount, selectedUTXOs, indicesToSign };
 };
 
-
-/**
-* createTxFromAnyWallet creates the raw Bitcoin transaction (including sending inscriptions), but don't sign tx. 
-* NOTE: Currently, the function only supports sending from Taproot address. 
-* @param pubKey buffer public key of the sender (It is the internal pubkey for Taproot address)
-* @param utxos list of utxos (include non-inscription and inscription utxos)
-* @param inscriptions list of inscription infos of the sender
-* @param sendInscriptionID id of inscription to send
-* @param receiverInsAddress the address of the inscription receiver
-* @param sendAmount satoshi amount need to send 
-* @param feeRatePerByte fee rate per byte (in satoshi)
-* @param isUseInscriptionPayFee flag defines using inscription coin to pay fee 
-* @returns the transaction id
-* @returns the hex signed transaction
-* @returns the network fee
-*/
-const createTxFromAnyWallet = async ({
-    pubKey,
-    utxos,
-    inscriptions,
-    sendInscriptionID = "",
-    receiverInsAddress,
-    sendAmount,
-    feeRatePerByte,
-    isUseInscriptionPayFeeParam = true, // default is true,
-    walletType = Transaction.SIGHASH_DEFAULT,
-    cancelFn,
-}: {
-    pubKey: Buffer,
-    utxos: UTXO[],
-    inscriptions: { [key: string]: Inscription[] },
-    sendInscriptionID: string,
-    receiverInsAddress: string,
-    sendAmount: BigNumber,
-    feeRatePerByte: number,
-    isUseInscriptionPayFeeParam: boolean,
-    walletType?: number,
-    cancelFn: () => void
-}): Promise<ICreateTxResp> => {
-
-    const { address } = generateTaprootAddressFromPubKey(pubKey);
-
-    const { base64Psbt, indicesToSign, selectedUTXOs, fee, changeAmount } = createRawTx({
-        pubKey,
-        utxos,
-        inscriptions,
-        sendInscriptionID,
-        receiverInsAddress,
-        sendAmount,
-        feeRatePerByte,
-        isUseInscriptionPayFeeParam,
-    });
-
-    // sign transaction 
-    const { base64SignedPsbt, msgTx, msgTxID, msgTxHex } = await handleSignPsbtWithSpecificWallet({
-        base64Psbt: base64Psbt,
-        indicesToSign: indicesToSign,
-        address: address,
-        isGetMsgTx: true,
-        walletType,
-        cancelFn
-    });
-
-
-    return {
-        tx: msgTx,
-        txID: msgTxID,
-        txHex: msgTxHex,
-        fee,
-        selectedUTXOs,
-        changeAmount,
-    };
-};
+ 
 
 /**
 * createTx creates the Bitcoin transaction (including sending inscriptions). 
@@ -1198,7 +1125,6 @@ export {
     selectUTXOs,
     createTx,
     createRawTx,
-    createTxFromAnyWallet,
     broadcastTx,
     createTxWithSpecificUTXOs,
     createRawTxDummyUTXOForSale,

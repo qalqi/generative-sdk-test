@@ -9,23 +9,17 @@ import {
     initEccLib,
     payments
 } from "bitcoinjs-lib";
-import { ethers, utils } from "ethers";
 
 import BIP32Factory from "bip32";
 import { BIP32Interface } from "bip32";
 import BigNumber from "bignumber.js";
 import { Network } from "./network";
-import Web3 from "web3";
 import { filterAndSortCardinalUTXOs } from "./selectcoin";
-import { hdkey } from "ethereumjs-wallet";
-import { keccak256 } from "js-sha3";
 import wif from "wif";
 
 initEccLib(ecc);
 const ECPair: ECPairAPI = ECPairFactory(ecc);
-const bip32 = BIP32Factory(ecc);
 
-const ETHWalletDefaultPath = "m/44'/60'/0'/0/0";
 const BTCSegwitWalletDefaultPath = "m/84'/0'/0'/0/0";
 
 
@@ -184,92 +178,12 @@ const importBTCPrivateKey = (
         taprootAddress: senderAddress,
     };
 };
-
-/**
-* deriveSegwitWallet derives bitcoin segwit wallet from private key taproot. 
-* @param privKeyTaproot private key taproot is used to a seed to generate segwit wall
-* @returns the segwit private key and the segwit address
-*/
-const deriveSegwitWallet = (
-    privKeyTaproot: Buffer
-): {
-    segwitPrivKeyBuffer: Buffer, segwitAddress: string
-} => {
-    const seedSegwit = ethers.utils.arrayify(
-        ethers.utils.keccak256(ethers.utils.arrayify(privKeyTaproot))
-    );
-    const root = bip32.fromSeed(Buffer.from(seedSegwit), Network);
-
-    const { privateKey: segwitPrivKey, address: segwitAddress } = generateP2PKHKeyFromRoot(root);
-
-    return {
-        segwitPrivKeyBuffer: segwitPrivKey,
-        segwitAddress: segwitAddress,
-    };
-};
-
-/**
-* deriveETHWallet derives eth wallet from private key taproot. 
-* @param privKeyTaproot private key taproot is used to a seed to generate eth wallet
-* @returns the eth private key and the eth address
-*/
-const deriveETHWallet = (privKeyTaproot: Buffer): { ethPrivKey: string, ethAddress: string } => {
-    const seed = ethers.utils.arrayify(
-        ethers.utils.keccak256(ethers.utils.arrayify(privKeyTaproot))
-    );
-
-    const hdwallet = hdkey.fromMasterSeed(Buffer.from(seed));
-    const ethWallet = hdwallet.derivePath(ETHWalletDefaultPath).getWallet();
-
-    return {
-        ethPrivKey: ethWallet.getPrivateKeyString(),
-        ethAddress: ethWallet.getAddressString(),
-    };
-};
-
-/**
-* signByETHPrivKey creates the signature on the data by ethPrivKey. 
-* @param ethPrivKey private key with either prefix "0x" or non-prefix
-* @param data data toSign is a hex string, MUST hash prefix "0x"
-* @returns the signature with prefix "0x"
-*/
-const signByETHPrivKey = (ethPrivKey: string, data: string): string => {
-    const web3 = new Web3();
-    const {
-        signature,
-    } = web3.eth.accounts.sign(data, ethPrivKey);
-
-    return signature;
-};
+  
 
 const getBitcoinKeySignContent = (message: string): Buffer => {
     return Buffer.from(message);
 };
-
-/**
-* derivePasswordWallet derive the password from ONE SPECIFIC evm address. 
-* This password is used to encrypt and decrypt the imported BTC wallet.
-* NOTE: The client should save the corresponding evm address to retrieve the same BTC wallet. 
-* @param provider ETH provider
-* @param evmAddress evm address is chosen to create the valid signature on IMPORT_MESSAGE
-* @returns the password string
-*/
-const derivePasswordWallet = async (evmAddress: string, provider: ethers.providers.Web3Provider): Promise<string> => {
-    // sign message with first sign transaction
-    const IMPORT_MESSAGE =
-        "Sign this message to import your Bitcoin wallet. This key will be used to encrypt your wallet.";
-    const toSign =
-        "0x" + getBitcoinKeySignContent(IMPORT_MESSAGE).toString("hex");
-    const signature = await provider.send("personal_sign", [
-        toSign,
-        evmAddress.toString(),
-    ]);
-
-    // const signature = randomBytes(64);
-
-    const password = keccak256(utils.arrayify(signature));
-    return password;
-};
+ 
 
 /**
 * encryptWallet encrypts Wallet object by AES algorithm. 
@@ -313,12 +227,8 @@ export {
     generateP2PKHKeyFromRoot,
     getBTCBalance,
     importBTCPrivateKey,
-    derivePasswordWallet,
     getBitcoinKeySignContent,
     encryptWallet,
     decryptWallet,
-    deriveSegwitWallet,
-    deriveETHWallet,
-    signByETHPrivKey,
     generateTaprootAddressFromPubKey,
 };
