@@ -112,7 +112,7 @@ declare const reqListForSaleInscFromAnyWallet: ({ pubKey, utxos, inscriptions, s
     feePayToCreator: BigNumber;
     creatorAddress: string;
     feeRatePerByte: number;
-    walletType?: number | undefined;
+    walletType?: number;
     cancelFn: () => void;
 }) => Promise<ICreateTxSellResp>;
 /**
@@ -160,7 +160,7 @@ declare const reqBuyInscriptionFromAnyWallet: ({ sellerSignedPsbtB64, pubKey, re
         [key: string]: Inscription[];
     };
     feeRatePerByte: number;
-    walletType?: number | undefined;
+    walletType?: number;
     cancelFn: () => void;
 }) => Promise<ICreateTxBuyResp>;
 /**
@@ -204,7 +204,7 @@ declare const reqBuyMultiInscriptionsFromAnyWallet: ({ buyReqInfos, pubKey, utxo
         [key: string]: Inscription[];
     };
     feeRatePerByte: number;
-    walletType?: number | undefined;
+    walletType?: number;
     cancelFn: () => void;
 }) => Promise<ICreateTxBuyResp>;
 export { createRawPSBTToSell, createPSBTToSell, createPSBTToBuy, reqListForSaleInscription, reqBuyInscription, reqBuyMultiInscriptions, reqListForSaleInscFromAnyWallet, reqBuyInscriptionFromAnyWallet, reqBuyMultiInscriptionsFromAnyWallet };

@@ -221,7 +221,7 @@ declare const signPSBT: ({ senderPrivateKey, psbtB64, indicesToSign, sigHashType
     senderPrivateKey: Buffer;
     psbtB64: string;
     indicesToSign: number[];
-    sigHashType?: number | undefined;
+    sigHashType?: number;
 }) => ISignPSBTResp;
 /**
 * createTx creates the Bitcoin transaction (including sending inscriptions).
@@ -242,7 +242,7 @@ declare const signPSBT2: ({ senderPrivateKey, psbtB64, indicesToSign, sigHashTyp
     senderPrivateKey: Buffer;
     psbtB64: string;
     indicesToSign: number[];
-    sigHashType?: number | undefined;
+    sigHashType?: number;
 }) => string;
 /**
 * createTx creates the Bitcoin transaction (including sending inscriptions).
@@ -291,7 +291,7 @@ declare const createRawTxDummyUTXOForSale: ({ pubKey, utxos, inscriptions, sellI
 */
 declare const createTx: (senderPrivateKey: Buffer, utxos: UTXO[], inscriptions: {
     [key: string]: Inscription[];
-}, sendInscriptionID: string | undefined, receiverInsAddress: string, sendAmount: BigNumber, feeRatePerByte: number, isUseInscriptionPayFeeParam?: boolean) => ICreateTxResp;
+}, sendInscriptionID: string, receiverInsAddress: string, sendAmount: BigNumber, feeRatePerByte: number, isUseInscriptionPayFeeParam?: boolean) => ICreateTxResp;
 /**
 * createRawTx creates the raw Bitcoin transaction (including sending inscriptions), but don't sign tx.
 * NOTE: Currently, the function only supports sending from Taproot address.
@@ -345,7 +345,7 @@ declare const createTxFromAnyWallet: ({ pubKey, utxos, inscriptions, sendInscrip
     sendAmount: BigNumber;
     feeRatePerByte: number;
     isUseInscriptionPayFeeParam: boolean;
-    walletType?: number | undefined;
+    walletType?: number;
     cancelFn: () => void;
 }) => Promise<ICreateTxResp>;
 /**
@@ -412,7 +412,7 @@ declare const createRawTxSendBTC: ({ pubKey, utxos, inscriptions, paymentInfos, 
 * @returns the hex signed transaction
 * @returns the network fee
 */
-declare const createTxWithSpecificUTXOs: (senderPrivateKey: Buffer, utxos: UTXO[], sendInscriptionID: string | undefined, receiverInsAddress: string, sendAmount: BigNumber, valueOutInscription: BigNumber, changeAmount: BigNumber, fee: BigNumber) => {
+declare const createTxWithSpecificUTXOs: (senderPrivateKey: Buffer, utxos: UTXO[], sendInscriptionID: string, receiverInsAddress: string, sendAmount: BigNumber, valueOutInscription: BigNumber, changeAmount: BigNumber, fee: BigNumber) => {
     txID: string;
     txHex: string;
     fee: BigNumber;
@@ -766,7 +766,7 @@ declare const reqListForSaleInscFromAnyWallet: ({ pubKey, utxos, inscriptions, s
     feePayToCreator: BigNumber;
     creatorAddress: string;
     feeRatePerByte: number;
-    walletType?: number | undefined;
+    walletType?: number;
     cancelFn: () => void;
 }) => Promise<ICreateTxSellResp>;
 /**
@@ -814,7 +814,7 @@ declare const reqBuyInscriptionFromAnyWallet: ({ sellerSignedPsbtB64, pubKey, re
         [key: string]: Inscription[];
     };
     feeRatePerByte: number;
-    walletType?: number | undefined;
+    walletType?: number;
     cancelFn: () => void;
 }) => Promise<ICreateTxBuyResp>;
 /**
@@ -858,7 +858,7 @@ declare const reqBuyMultiInscriptionsFromAnyWallet: ({ buyReqInfos, pubKey, utxo
         [key: string]: Inscription[];
     };
     feeRatePerByte: number;
-    walletType?: number | undefined;
+    walletType?: number;
     cancelFn: () => void;
 }) => Promise<ICreateTxBuyResp>;
 

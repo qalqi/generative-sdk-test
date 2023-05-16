@@ -14,9 +14,9 @@ declare const handleSignPsbtWithSpecificWallet: ({ base64Psbt, indicesToSign, ad
     base64Psbt: string;
     indicesToSign: number[];
     address: string;
-    sigHashType?: number | undefined;
-    isGetMsgTx?: boolean | undefined;
-    walletType?: number | undefined;
+    sigHashType?: number;
+    isGetMsgTx?: boolean;
+    walletType?: number;
     cancelFn: () => void;
 }) => Promise<{
     base64SignedPsbt: string;
