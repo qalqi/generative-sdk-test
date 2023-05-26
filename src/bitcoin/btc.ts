@@ -49,6 +49,39 @@ export const getBalance_BTC_DOGE = async (address, symbol) => {
   return serverRes;
 };
 
+export const getBalance_mempool = async (address: string, symbol: string) => {
+  let serverRes =
+    symbol == 'BTC' || symbol == 'BTC_TAPROOT'
+      ? {
+          value: 0,
+          error: false,
+          currency: {
+            symbol: 'BTC',
+            decimals: BTC_DECIMAL,
+          },
+        }
+      : {
+          value: 0,
+          error: false,
+          currency: {
+            symbol: 'DOGE',
+            decimals: DOGE_DECIMAL,
+          },
+        };
+  let balance = 0;
+  await axios
+    .get(`https://mempool.space/api/address/${address}`)
+    .then((res) => {
+      balance = res.data.chain_stats.funded_txo_sum - res.data.chain_stats.spent_txo_sum;
+      serverRes.value = balance;
+    })
+    .catch((err) => {
+      serverRes.error = true;
+      console.log(err);
+    });
+  return balance;
+};
+
 /**
  * getTransactions_BTC_DOGE fetches txns for BTC or DOGE
  * @param {any} address
@@ -77,6 +110,22 @@ export const getTransactions_BTC_DOGE = async (address, symbol, page = 1) => {
     });
 
   return serverRes;
+};
+
+export const getTransactions_mempool = async (address) => {
+  const apiUrl = `https://mempool.space/api/address/${address}/txs`;
+
+  try {
+    const response = await axios.get(apiUrl);
+    const { data } = response;
+    return data?.map((tx) => ({
+      ...tx,
+      ...{ type: 'mempool' },
+    }));
+  } catch (error) {
+    console.error(error);
+    return [];
+  }
 };
 
 //curl -sSL "https://mempool.space/api/address/1KFHE7w8BhaENAswwryaoccDb6qcT6DbYY/utxo"
@@ -218,6 +267,33 @@ export const getAllUnspentTransactions = async (address, symbol) => {
  * @param {string} symbol
  * @returns {any}
  */
+export const getFeeRateAndFees_mempool = async (symbol: string) => {
+  const BYTES_FOR_ONE_INPUT_TWO_OUTPUTS = 400;
+  const offlineFeeRate = symbol == 'BTC_TAPROOT' || symbol == 'BTC' ? 13 : 1000;
+  try {
+    const apiUrl = 'https://mempool.space/api/v1/fees/recommended';
+    const response = await axios.get(apiUrl);
+
+    const { fastestFee, halfHourFee, hourFee, economyFee, minimumFee } = response.data;
+
+    return {
+      feeRate: halfHourFee,
+      fees: (halfHourFee * BYTES_FOR_ONE_INPUT_TWO_OUTPUTS) / Math.pow(10, 8),
+    };
+  } catch (error) {
+    console.error(error);
+    return {
+      feeRate: offlineFeeRate,
+      fees: (offlineFeeRate * BYTES_FOR_ONE_INPUT_TWO_OUTPUTS) / Math.pow(10, 8),
+    };
+  }
+};
+
+/**
+ * getFeeRateAndFees_BTC_DOGE fetches avg feeRate and avg price for one input and two outputs
+ * @param {string} symbol
+ * @returns {any}
+ */
 export const getFeeRateAndFees_BTC_DOGE = async (symbol: string) => {
   const BYTES_FOR_ONE_INPUT_TWO_OUTPUTS = 400;
   const offlineFeeRate = symbol == 'BTC_TAPROOT' || symbol == 'BTC' ? 7 : 1000;
@@ -278,6 +354,22 @@ export const broadcastTxn_BTC_DOGE = async (txHex, symbol) => {
   return serverRes;
 };
 
+export const broadcastTxn_mempool = async (rawTransaction) => {
+  const apiUrl = 'https://mempool.space/api/tx';
+  let serverRes = { hash: '', error: false, errorMessage: '' };
+
+  try {
+    const response = await axios.post(apiUrl, rawTransaction);
+    const { data } = response;
+    serverRes.hash = data;
+    return serverRes;
+  } catch (error) {
+    console.error(error);
+    serverRes.error = true;
+    serverRes.errorMessage = error.message;
+    return serverRes;
+  }
+};
 /**
  * getOrdinalsList
  * @param {string} address
