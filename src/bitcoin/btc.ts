@@ -1,4 +1,6 @@
 import axios, { AxiosRequestConfig } from 'axios';
+import BigNumber from 'bignumber.js';
+
 interface keyable {
   [key: string]: any;
 }
@@ -49,6 +51,80 @@ export const getBalance_BTC_DOGE = async (address, symbol) => {
   return serverRes;
 };
 
+/**
+ * filterAndSortCardinalUTXOs filter cardinal utxos and inscription utxos.
+ * @param utxos list of utxos (include non-inscription and inscription utxos)
+ * @param inscriptions list of inscription infos of the sender
+ * @returns the list of cardinal UTXOs which is sorted descending by value
+ * @returns the list of inscription UTXOs
+ * @returns total amount of cardinal UTXOs
+ */
+
+interface Inscription {
+  offset: BigNumber;
+  id: string;
+}
+
+interface UTXO {
+  tx_hash: string;
+  tx_output_n: number;
+  value: BigNumber;
+}
+const filterAndSortCardinalUTXOs = (
+  utxos: UTXO[],
+  inscriptions: { [key: string]: Inscription[] }
+): { cardinalUTXOs: UTXO[]; inscriptionUTXOs: UTXO[]; totalCardinalAmount: BigNumber } => {
+  let cardinalUTXOs: UTXO[] = [];
+  const inscriptionUTXOs: UTXO[] = [];
+  const BNZero = new BigNumber(0);
+
+  let totalCardinalAmount = BNZero;
+
+  // filter normal UTXO and inscription UTXO to send
+  for (const utxo of utxos) {
+    // txIDKey = tx_hash:tx_output_n
+    let txIDKey = utxo.tx_hash.concat(':');
+    txIDKey = txIDKey.concat(utxo.tx_output_n.toString());
+
+    // try to get inscriptionInfos
+    const inscriptionInfos = inscriptions[txIDKey];
+
+    if (
+      inscriptionInfos === undefined ||
+      inscriptionInfos === null ||
+      inscriptionInfos.length == 0
+    ) {
+      // normal UTXO
+      cardinalUTXOs.push(utxo);
+      totalCardinalAmount = totalCardinalAmount.plus(utxo.value);
+    } else {
+      inscriptionUTXOs.push(utxo);
+    }
+  }
+
+  cardinalUTXOs = cardinalUTXOs.sort((a: UTXO, b: UTXO): number => {
+    if (a.value.gt(b.value)) {
+      return -1;
+    }
+    if (a.value.lt(b.value)) {
+      return 1;
+    }
+    return 0;
+  });
+
+  return { cardinalUTXOs, inscriptionUTXOs, totalCardinalAmount };
+};
+
+
+const getCardinalBalance = (params: {
+  utxos: UTXO[];
+  inscriptions: { [key: string]: Inscription[] };
+}): BigNumber => {
+  const { utxos, inscriptions } = params;
+  const { totalCardinalAmount } = filterAndSortCardinalUTXOs(utxos, inscriptions);
+  return totalCardinalAmount;
+};
+
 export const getBalance_mempool = async (address: string, symbol: string) => {
   let serverRes =
     symbol == 'BTC' || symbol == 'BTC_TAPROOT'
@@ -56,7 +132,7 @@ export const getBalance_mempool = async (address: string, symbol: string) => {
           value: 0,
           error: false,
           currency: {
-            symbol: 'BTC',
+            symbol: "BTC",
             decimals: BTC_DECIMAL,
           },
         }
@@ -69,16 +145,34 @@ export const getBalance_mempool = async (address: string, symbol: string) => {
           },
         };
   let balance = 0;
-  await axios
-    .get(`https://mempool.space/api/address/${address}`)
-    .then((res) => {
-      balance = res.data.chain_stats.funded_txo_sum - res.data.chain_stats.spent_txo_sum;
-      serverRes.value = balance;
-    })
-    .catch((err) => {
-      serverRes.error = true;
-      console.log(err);
-    });
+  if (symbol == 'BTC') {
+    await axios
+      .get(`https://mempool.space/api/address/${address}`)
+      .then((res) => {
+        balance = res.data.chain_stats.funded_txo_sum - res.data.chain_stats.spent_txo_sum;
+        serverRes.value = balance;
+      })
+      .catch((err) => {
+        serverRes.error = true;
+        console.log(err);
+      });
+  } else {
+    const utxos = await getAllUnspentTransactions_mempool(address, 'BTC_TAPROOT');
+    // todo: get inscriptions
+    let inscriptions: { [key: string]: Inscription[] } = await getOrdinalsList(address);
+
+    const parsedUtxos =
+      utxos?.length > 0
+        ? utxos?.map((utxo: any) => ({
+            tx_hash: utxo.txid,
+            tx_output_n: utxo.vout,
+            value: new BigNumber(utxo.value), // normal
+          }))
+        : [];
+    const cardinalBalance = await getCardinalBalance({ utxos: parsedUtxos, inscriptions });
+    serverRes.value = cardinalBalance.toNumber();
+  }
+
   return balance;
 };
 
@@ -377,6 +471,8 @@ export const broadcastTxn_mempool = async (rawTransaction) => {
  */
 export const getOrdinalsList = async (address: string) => {
   const url = `https://ordapi.xyz/address/${address}`;
+  // for padding left in nft use
+  //output_value
 
   try {
     const response = await axios.get(url);
