@@ -2,6 +2,22 @@ import { Psbt, Transaction } from "bitcoinjs-lib";
 
 import BigNumber from "bignumber.js";
 
+function convertOffsetToNumber(inscriptions) {
+    const result = {};
+  
+    for (let key in inscriptions) {
+      result[key] = inscriptions[key].map(item => {
+        return {
+          id: item.id,
+          offset: new BigNumber(item.offset)
+        };
+      });
+    }
+  
+    return result;
+  }
+  
+
 interface UTXO {
     tx_hash: string;
     tx_output_n: number;

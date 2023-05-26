@@ -11,10 +11,12 @@ import {
   createTx,
   Inscription,
   getBTCBalance,
+  UTXO,
+  ICreateTxResp,
 } from '../src/index';
 import axios from 'axios';
 import BigNumber from 'bignumber.js';
-
+import { getAllUnspentTransactions_mempool } from '../src/bitcoin/btc';
 const bip32 = BIP32Factory(ecc);
 initEccLib(ecc);
 
@@ -38,6 +40,7 @@ export const mnemonicToTaprootPrivateKey = async (mnemonic: string, testnet?) =>
 };
 describe('Sign msg Tx', async () => {
   it('create signed raw tc tx', async () => {
+ 
     const isTestNet = true;
     const privateKey = await mnemonicToTaprootPrivateKey(TEST_MNE_1, isTestNet);
     setBTCNetwork(isTestNet ? NetworkType.Testnet : NetworkType.Mainnet);
@@ -95,6 +98,8 @@ describe('Sign msg Tx', async () => {
   });
 });
 
+
+
 export const getUtxos = async (address: string) => {
   //curl -sSL "https://mempool.space/testnet/api/address/tb1q4kgratttzjvkxfmgd95z54qcq7y6hekdm3w56u/utxo"
   let utxos = [];
@@ -139,3 +144,57 @@ balance = 51546
     });
   return balance;
 };
+
+/**
+ * createTx creates the Bitcoin transaction (including sending inscriptions).
+ * NOTE: Currently, the function only supports sending from Taproot address.
+ * @param mnemonic string mnemonic of the sender
+ * @param utxos list of utxos (include non-inscription and inscription utxos)
+ * @param inscriptions list of inscription infos of the sender
+ * @param sendInscriptionID id of inscription to send
+ * @param receiverInsAddress the address of the inscription receiver
+ * @param sendAmount satoshi amount need to send
+ * @param feeRatePerByte fee rate per byte (in satoshi)
+ * @param isUseInscriptionPayFee flag defines using inscription coin to pay fee
+ * @returns the transaction id
+ * @returns the hex signed transaction
+ * @returns the network fee
+ */
+export const createTransaction_BTC_TAPROOT = async (
+  mnemonic: string,
+  utxos: UTXO[],
+  inscriptions: { [key: string]: Inscription[] },
+  sendInscriptionID = '',
+  receiverInsAddress: string,
+  sendAmount: BigNumber,
+  feeRatePerByte: number,
+  isUseInscriptionPayFeeParam = true // default is true
+): Promise<ICreateTxResp> => {
+  const privateKey = await mnemonicToTaprootPrivateKey(mnemonic);
+
+  const response = await createTx(
+    privateKey,
+    utxos,
+    inscriptions,
+    sendInscriptionID,
+    receiverInsAddress,
+    sendAmount,
+    feeRatePerByte,
+    isUseInscriptionPayFeeParam
+  );
+  return response;
+};
+
+
+
+describe('btc api tests', async () => {
+  it('get utxos', async () => {
+    const utxos_mempool = await getAllUnspentTransactions_mempool(
+      'bc1qxhmdufsvnuaaaer4ynz88fspdsxq2h9e9cetdj',
+      'BTC'
+    );
+    console.log({ utxos_mempool });
+    return true;
+    
+});
+});
