@@ -1,6 +1,17 @@
 import { BuyReqFullInfo, ICreateRawTxResp, ICreateTxResp, ICreateTxSplitInscriptionResp, ISignPSBTResp, Inscription, NeedPaymentUTXO, PaymentInfo, UTXO } from "./types";
+import { payments } from "bitcoinjs-lib";
 import { selectUTXOs } from "./selectcoin";
 import BigNumber from "bignumber.js";
+import { ECPairInterface } from "ecpair";
+export declare const DefaultSequenceRBF = 4294967293;
+export interface IKeyPairInfo {
+    address: string;
+    addressType: number;
+    keyPair: ECPairInterface;
+    payment: payments.Payment;
+    signer: any;
+    sigHashTypeDefault: number;
+}
 /**
 * createTx creates the Bitcoin transaction (including sending inscriptions).
 * NOTE: Currently, the function only supports sending from Taproot address.
@@ -118,6 +129,14 @@ declare const createRawTx: ({ pubKey, utxos, inscriptions, sendInscriptionID, re
     feeRatePerByte: number;
     isUseInscriptionPayFeeParam: boolean;
 }) => ICreateRawTxResp;
+export declare const BTCAddressType: {
+    P2TR: number;
+    P2WPKH: number;
+};
+export declare const getKeyPairInfo: ({ privateKey, address, }: {
+    privateKey: Buffer;
+    address: string;
+}) => IKeyPairInfo;
 /**
 * createTx creates the Bitcoin transaction (including sending inscriptions).
 * NOTE: Currently, the function only supports sending from Taproot address.

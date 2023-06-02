@@ -172,8 +172,8 @@ const getScriptFromTxId = async (txId, vout) => {
   }
 };
 
-export const getAllUnspentTransactions_mempool = async (address, symbol) => {
-  const apiUrl = `https://mempool.space/api/address/${address}/utxo`;
+export const getAllUnspentTransactions_mempool = async (address, symbol, testnet = false) => {
+  const apiUrl = testnet?  `https://mempool.space/testnet/api/address/${address}/utxo` : `https://mempool.space/api/address/${address}/utxo`;
 
   try {
     const response = await axios.get(apiUrl);

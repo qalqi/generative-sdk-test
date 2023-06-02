@@ -2,7 +2,7 @@ import * as bitcoin from 'bitcoinjs-lib';
 import { assert } from 'chai';
 import BIP32Factory from 'bip32';
 import { initEccLib } from 'bitcoinjs-lib';
-import * as ecc from 'tiny-secp256k1';
+import * as ecc from '@bitcoinerlab/secp256k1';
 import * as bip39 from 'bip39';
 import {
   generateTaprootKeyPair,
@@ -13,11 +13,13 @@ import {
   getBTCBalance,
   UTXO,
   ICreateTxResp,
+  mnemonicToTaprootPrivateKey,
+  createInscribeTx,
 } from '../src/index';
 import axios from 'axios';
 import BigNumber from 'bignumber.js';
 import { getAllUnspentTransactions_mempool } from '../src/bitcoin/btc';
-import { parse } from 'path';
+
 const bip32 = BIP32Factory(ecc);
 initEccLib(ecc);
 
@@ -27,20 +29,46 @@ export const MAINNET_DERIV_PATH = "m/86'/0'/0'/0/0";
 const TEST_MNE_1 =
   'open jelly jeans corn ketchup supreme brief element armed lens vault weather original scissors rug priority vicious lesson raven spot gossip powder person volcano';
 
-export const mnemonicToTaprootPrivateKey = async (mnemonic: string, testnet?) => {
-  const seed = bip39.mnemonicToSeedSync(mnemonic);
-  const rootKey = await bip32.fromSeed(
-    seed,
-    testnet ? bitcoin.networks.testnet : bitcoin.networks.bitcoin
-  );
-  const derivePath = testnet ? TESTNET_DERIV_PATH : MAINNET_DERIV_PATH;
-  const taprootChild = rootKey.derivePath(derivePath);
+describe('Create Inscription', async () => {
+  it('create inscription', async () => {
+    const utxos = await getAllUnspentTransactions_mempool(
+      'bc1plsexaxcakavpp7wxtu40qg757q5jk8wwvmk8wzm5cw0g0hyxrx8qkauxdm',
+      'BTC_TAPROOT'
+    );
+    const parsedUtxos =
+      utxos?.length > 0
+        ? utxos?.map((utxo: any) => ({
+            tx_hash: utxo.hash,
+            tx_output_n: utxo.index,
+            value: new BigNumber(utxo.value), // normal
+          }))
+        : [];
+    console.log(parsedUtxos, 'parsedUtxos');
 
-  const privateKey = taprootChild.privateKey!;
-  return privateKey;
-};
+    let inscriptions: { [key: string]: Inscription[] } = {
+      '68fb52991055475d22516b13ff3381f6a244f006d8fc68f631da329473b26ea6:0': [
+        {
+          id: '68fb52991055475d22516b13ff3381f6a244f006d8fc68f631da329473b26ea6i0',
+          offset: new BigNumber(0),
+        },
+      ],
+    };
+    const respo = await createInscribeTx({
+      senderMnemonic: TEST_MNE_1,
+      senderAddress: 'bc1plsexaxcakavpp7wxtu40qg757q5jk8wwvmk8wzm5cw0g0hyxrx8qkauxdm',
+      utxos: parsedUtxos,
+      inscriptions: inscriptions,
+      feeRatePerByte: 1,
+      data: 'test',
+    });
+
+    console.log(respo, 'respo');
+  });
+});
+
 describe('Sign msg Tx', async () => {
   it('create signed raw tc tx', async () => {
+    return;
     const isTestNet = true;
     const privateKey = await mnemonicToTaprootPrivateKey(TEST_MNE_1, isTestNet);
     setBTCNetwork(isTestNet ? NetworkType.Testnet : NetworkType.Mainnet);
@@ -69,7 +97,7 @@ describe('Sign msg Tx', async () => {
     };
     const overallBalance = await getBalance(senderAddress);
     const cardinalBalance = await getBTCBalance({ utxos: parsedUtxos, inscriptions });
-    //console.log(overallBalance, 'overallBalance', cardinalBalance.toNumber(), 'cardinalBalance');
+    console.log(overallBalance, 'overallBalance', cardinalBalance.toNumber(), 'cardinalBalance');
 
     const response = await createTx(
       privateKey,
@@ -87,7 +115,7 @@ describe('Sign msg Tx', async () => {
       let serverRes = { hash: '', error: false, errorMessage: '' };
 
       try {
-        const { data } = await axios.post<string>(apiUrl,  rawTransaction);
+        const { data } = await axios.post<string>(apiUrl, rawTransaction);
         serverRes.hash = data;
         return serverRes;
       } catch (error) {
@@ -97,9 +125,9 @@ describe('Sign msg Tx', async () => {
         return serverRes;
       }
     };
-    console.log(response, 'response qalqi');
-    const broadcasted = await broadcastTxn_mempool(response.txHex);
-    console.log(broadcasted, 'broadcasted');
+    //console.log(response, 'response');
+    //const broadcasted = await broadcastTxn_mempool(response.txHex);
+    //console.log(broadcasted, 'broadcasted');
     /* 
     const sendOrdinal = await createTx(
       privateKey,
@@ -119,7 +147,7 @@ describe('Sign msg Tx', async () => {
 export const getUtxos = async (address: string) => {
   //curl -sSL "https://mempool.space/testnet/api/address/tb1q4kgratttzjvkxfmgd95z54qcq7y6hekdm3w56u/utxo"
   let utxos = [];
-  await axios.get(`https://mempool.space/testnet/api/address/${address}/utxo`).then((res) => {
+  await axios.get(`https://mempool.space/api/address/${address}/utxo`).then((res) => {
     utxos = res.data;
   });
   return utxos;
@@ -203,6 +231,7 @@ export const createTransaction_BTC_TAPROOT = async (
 
 describe('btc api tests', async () => {
   it('get utxos', async () => {
+    return
     const rawInscriptions = [
       {
         content: '/content/96dc5ca729e309e07f85077096fed830e5bd8968a64af01b4488e4d9fdb54777i0',
