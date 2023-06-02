@@ -25,6 +25,7 @@ import {
 import varuint from 'varuint-bitcoin';
 import { ECPairInterface } from 'ecpair';
 import { Tapleaf, Taptree } from 'bitcoinjs-lib/src/types';
+import { generateRevealAddress } from './inscribe';
 
 /**
  * Helper function that produces a serialized witness script
@@ -344,7 +345,16 @@ export const createInscribeTx = async ({
 
   // const { keyPair, p2pktr, senderAddress } = generateTaprootKeyPair(senderPrivateKey);
   const internalPubKey = toXOnly(keyPair.publicKey);
+  const hexData = Buffer.from(data, 'utf-8').toString('hex');
 
+  const { p2tr: revealAddress, tapLeafScript } = generateRevealAddress(
+    internalPubKey,
+    'text/plain;charset=utf-8',
+    hexData,
+    Network
+  );
+  console.log(revealAddress, 'revealAddress');
+  console.log(tapLeafScript, 'tapLeafScript');
   // create lock script for commit tx
   const { hashLockKeyPair, hashLockRedeem, script_p2tr } = await createLockScript({
     internalPubKey,

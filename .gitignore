@@ -72,3 +72,5 @@ test/.env
 
 .idea
 .vscode
+
+test/secret.ts

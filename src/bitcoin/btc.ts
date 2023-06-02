@@ -151,8 +151,8 @@ export interface AddressTxsUtxo {
   status: TxStatus;
   value: number;
 }
-const getScriptFromTxId = async (txId, vout) => {
-  const apiUrl = `https://mempool.space/api/tx/${txId}`;
+const getScriptFromTxId = async (txId, vout,testnet = false) => {
+  const apiUrl = testnet ? `https://mempool.space/testnet/api/tx/${txId}` : `https://mempool.space/api/tx/${txId}`;
 
   try {
     const response = await axios.get(apiUrl);
@@ -160,7 +160,7 @@ const getScriptFromTxId = async (txId, vout) => {
 
     const output = transaction.vout[vout];
     if (output) {
-      const script = output.scriptpubkey;
+      const script = output;
       return script;
     } else {
       console.log('Output not found');
@@ -172,13 +172,14 @@ const getScriptFromTxId = async (txId, vout) => {
   }
 };
 
+
 export const getAllUnspentTransactions_mempool = async (address, symbol, testnet = false) => {
   const apiUrl = testnet?  `https://mempool.space/testnet/api/address/${address}/utxo` : `https://mempool.space/api/address/${address}/utxo`;
 
   try {
     const response = await axios.get(apiUrl);
     const unspentTransactions = response.data;
-    if (symbol == 'BTC_TAPROOT') {
+    if (false) {
       return unspentTransactions.map((utxo: AddressTxsUtxo) => ({
         hash: utxo.txid,
         index: utxo.vout,
@@ -187,12 +188,15 @@ export const getAllUnspentTransactions_mempool = async (address, symbol, testnet
       }));
     } else {
       const promises = unspentTransactions.map(async (utxo: AddressTxsUtxo) => {
+        let scripData = await getScriptFromTxId(utxo.txid, utxo.vout, testnet);
         return {
           hash: utxo.txid,
           index: utxo.vout,
-          address: address,
           value: utxo.value,
-          script: await getScriptFromTxId(utxo.txid, utxo.vout),
+          blockHeight: utxo.status.block_height,
+          script: scripData.scriptpubkey,
+          address: scripData.scriptpubkey_address,
+          type: scripData.scriptpubkey_type,
         };
       });
       return Promise.all(promises);

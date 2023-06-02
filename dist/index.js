@@ -33,6 +33,7 @@ function _interopNamespace(e) {
 }
 
 var ecc__namespace = /*#__PURE__*/_interopNamespace(ecc);
+var ecc__default = /*#__PURE__*/_interopDefaultLegacy(ecc);
 var bitcoin__namespace = /*#__PURE__*/_interopNamespace(bitcoin);
 var wif__default = /*#__PURE__*/_interopDefaultLegacy(wif);
 var axios__default = /*#__PURE__*/_interopDefaultLegacy(axios);
@@ -5091,6 +5092,44 @@ const reqBuyMultiInscriptions = (params) => {
     };
 };
 
+BIP32Factory__default["default"](ecc__default["default"]);
+const splitByNChars = (str, n) => {
+    const result = [];
+    let i = 0;
+    const len = str.length;
+    while (i < len) {
+        result.push(str.substr(i, n));
+        i += n;
+    }
+    return result;
+};
+const generateRevealAddress = (xOnlyPubKey, mimeType, hexData, network) => {
+    let inscribeLockScript = bitcoin__namespace.script.fromASM(`${xOnlyPubKey.toString('hex')} OP_CHECKSIG OP_0 OP_IF ${Buffer.from('ord').toString('hex')} OP_1 ${Buffer.from(mimeType).toString('hex')} OP_0 ${splitByNChars(hexData, 1040).join(' ')} OP_ENDIF`);
+    inscribeLockScript = Buffer.from(inscribeLockScript.toString('hex').replace('6f726451', '6f72640101'), 'hex');
+    const scriptTree = {
+        output: inscribeLockScript,
+    };
+    const inscribeLockRedeem = {
+        output: inscribeLockScript,
+        redeemVersion: 192,
+    };
+    const inscribeP2tr = bitcoin__namespace.payments.p2tr({
+        internalPubkey: xOnlyPubKey,
+        scriptTree,
+        network,
+        redeem: inscribeLockRedeem,
+    });
+    const tapLeafScript = {
+        leafVersion: inscribeLockRedeem.redeemVersion,
+        script: inscribeLockRedeem.output || Buffer.from(''),
+        controlBlock: inscribeP2tr.witness[inscribeP2tr.witness.length - 1],
+    };
+    return {
+        p2tr: inscribeP2tr,
+        tapLeafScript,
+    };
+};
+
 /**
  * Helper function that produces a serialized witness script
  * https://github.com/bitcoinjs/bitcoinjs-lib/blob/master/test/integration/csv.spec.ts#L477
@@ -5175,8 +5214,8 @@ const createLockScript = ({ internalPubKey, data, }) => {
     // const hexStr = "207022ae3ead9927479c920d24b29249e97ed905ad5865439f962ba765147ee038ac0063036f7264010118746578742f706c61696e3b636861727365743d7574662d3800367b2270223a226272632d3230222c226f70223a227472616e73666572222c227469636b223a227a626974222c22616d74223a2231227d68";
     const hashLockScript = Buffer.from(hexStr, 'hex');
     console.log('hashLockScript: ', hashLockScript.toString('hex'));
-    const asm2 = bitcoin__namespace.script.toASM(hashLockScript);
-    console.log("asm2: ", asm2);
+    // const asm2 = script.toASM(hashLockScript);
+    // console.log("asm2: ", asm2);
     const hashLockRedeem = {
         output: hashLockScript,
         redeemVersion: 192,
@@ -5292,6 +5331,10 @@ const createInscribeTx = async ({ senderMnemonic, senderAddress, utxos, inscript
     const { addressType, payment, keyPair, signer, sigHashTypeDefault } = keyPairInfo;
     // const { keyPair, p2pktr, senderAddress } = generateTaprootKeyPair(senderPrivateKey);
     const internalPubKey = toXOnly(keyPair.publicKey);
+    const hexData = Buffer.from(data, 'utf-8').toString('hex');
+    const { p2tr: revealAddress, tapLeafScript } = generateRevealAddress(internalPubKey, 'text/plain;charset=utf-8', hexData, exports.Network);
+    console.log(revealAddress, 'revealAddress');
+    console.log(tapLeafScript, 'tapLeafScript');
     // create lock script for commit tx
     const { hashLockKeyPair, hashLockRedeem, script_p2tr } = await createLockScript({
         internalPubKey,
