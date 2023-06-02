@@ -63,7 +63,6 @@
     "axios": "^0.24.0",
     "bignumber.js": "^9.1.1",
     "bip32": "^4.0.0",
-    "bip38": "^3.1.1",
     "bip39": "^3.1.0",
     "bitcoinjs-lib": "github:generative-xyz/bitcoinjs-lib",
     "browserify": "^17.0.0",

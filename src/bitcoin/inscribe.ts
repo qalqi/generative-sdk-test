@@ -13,8 +13,9 @@ import {
 import ecc from '@bitcoinerlab/secp256k1';
 import { mnemonicToSeedSync } from 'bip39';
 import wif from 'wif';
-import bip38 from 'bip38'; // Passpharase encryption
 import { getTxSize } from './sizeEstimate';
+
+// Source - https://github.com/OrdinalSafe/ordinalsafe-extension/blob/e26ac38ed8717d62714dd75e6ea573fbd58b14c2/src/pages/Popup/pages/Inscribe.jsx#L70
 const DUST_LIMIT = 546;
 const bip32 = BIP32Factory(ecc);
 
