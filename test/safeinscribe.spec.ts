@@ -1,7 +1,6 @@
 import * as bitcoin from 'bitcoinjs-lib';
 import { getAllUnspentTransactions_mempool } from '../src/bitcoin/btc';
 import { SafeCardinalUTXO, btc_inscribe, getInscribeTxsInfo } from '../src/bitcoin/inscribe';
-import { SQUARE_MNE } from './secret';
 
 const TEST_MNE_1 =
   'open jelly jeans corn ketchup supreme brief element armed lens vault weather original scissors rug priority vicious lesson raven spot gossip powder person volcano';
@@ -39,7 +38,7 @@ describe('Create Inscription', async () => {
 
    
     const respo = await btc_inscribe(
-      SQUARE_MNE,
+      TEST_MNE_1,
       'text/plain;charset=utf-8',
       'hello world',
       null,
