@@ -5103,6 +5103,494 @@ const mnemonicToTaprootPrivateKey = async (mnemonic, testnet) => {
     return privateKey;
 };
 
+const P2PKH_IN_SIZE = 148;
+const P2PKH_OUT_SIZE = 34;
+const P2SH_OUT_SIZE = 32;
+const P2SH_P2WPKH_OUT_SIZE = 32;
+const P2SH_P2WSH_OUT_SIZE = 32;
+// All segwit input sizes are reduced by 1 WU to account for the witness item counts being added for every input per the transaction header
+const P2SH_P2WPKH_IN_SIZE = 90.75;
+const P2WPKH_IN_SIZE = 67.75;
+const P2WPKH_OUT_SIZE = 31;
+const P2WSH_OUT_SIZE = 43;
+const P2TR_OUT_SIZE = 43;
+const P2TR_IN_SIZE = 57.25;
+const PUBKEY_SIZE = 33;
+const SIGNATURE_SIZE = 72;
+function getSizeOfScriptLengthElement(length) {
+    if (length < 75) {
+        return 1;
+    }
+    else if (length <= 255) {
+        return 2;
+    }
+    else if (length <= 65535) {
+        return 3;
+    }
+    else if (length <= 4294967295) {
+        return 5;
+    }
+    else {
+        return undefined;
+    }
+}
+function getSizeOfVarInt(length) {
+    if (length < 253) {
+        return 1;
+    }
+    else if (length < 65535) {
+        return 3;
+    }
+    else if (length < 4294967295) {
+        return 5;
+    }
+    else if (length < 18446744073709551615) {
+        return 9;
+    }
+    else {
+        return undefined;
+    }
+}
+function getTxOverheadVBytes(input_script, input_count, output_count) {
+    let witness_vbytes;
+    if (input_script === 'P2PKH' || input_script === 'P2SH') {
+        witness_vbytes = 0;
+    }
+    else {
+        // Transactions with segwit inputs have extra overhead
+        witness_vbytes =
+            0.25 + // segwit marker
+                0.25 + // segwit flag
+                input_count / 4; // witness element count per input
+    }
+    return (4 + // nVersion
+        getSizeOfVarInt(input_count) + // number of inputs
+        getSizeOfVarInt(output_count) + // number of outputs
+        4 + // nLockTime
+        witness_vbytes);
+}
+function getTxOverheadExtraRawBytes(input_script, input_count) {
+    let witness_bytes;
+    // Returns the remaining 3/4 bytes per witness bytes
+    if (input_script === 'P2PKH' || input_script === 'P2SH') {
+        witness_bytes = 0;
+    }
+    else {
+        // Transactions with segwit inputs have extra overhead
+        witness_bytes =
+            0.25 + // segwit marker
+                0.25 + // segwit flag
+                input_count / 4; // witness element count per input
+    }
+    return witness_bytes * 3;
+}
+function getTxSize(inputCount, inputScript, signaturesPerInput, pubkeysPerInput, p2pkhOutputCount, p2shOutputCount, p2shP2wpkhOutputCount, p2shP2wshOutputCount, p2wpkhOutputCount, p2wshOutputCount, p2trOutputCount) {
+    // Validate transaction input attributes
+    if (!Number.isInteger(inputCount) || inputCount < 0) {
+        return undefined;
+    }
+    if (!Number.isInteger(signaturesPerInput) || signaturesPerInput < 0) {
+        return undefined;
+    }
+    if (!Number.isInteger(pubkeysPerInput) || pubkeysPerInput < 0) {
+        return undefined;
+    }
+    // Validate transaction output attributes
+    if (!Number.isInteger(p2pkhOutputCount) || p2pkhOutputCount < 0) {
+        return undefined;
+    }
+    if (!Number.isInteger(p2shOutputCount) || p2shOutputCount < 0) {
+        return undefined;
+    }
+    if (!Number.isInteger(p2shP2wpkhOutputCount) || p2shP2wpkhOutputCount < 0) {
+        return undefined;
+    }
+    if (!Number.isInteger(p2shP2wshOutputCount) || p2shP2wshOutputCount < 0) {
+        return undefined;
+    }
+    if (!Number.isInteger(p2wpkhOutputCount) || p2wpkhOutputCount < 0) {
+        return undefined;
+    }
+    if (!Number.isInteger(p2wshOutputCount) || p2wshOutputCount < 0) {
+        return undefined;
+    }
+    if (!Number.isInteger(p2trOutputCount) || p2trOutputCount < 0) {
+        return undefined;
+    }
+    const output_count = p2pkhOutputCount +
+        p2shOutputCount +
+        p2shP2wpkhOutputCount +
+        p2shP2wshOutputCount +
+        p2wpkhOutputCount +
+        p2wshOutputCount +
+        p2trOutputCount;
+    // In most cases the input size is predictable. For multisig inputs we need to perform a detailed calculation
+    var inputSize = 0; // in virtual bytes
+    var inputWitnessSize = 0;
+    let redeemScriptSize;
+    let scriptSigSize;
+    switch (inputScript) {
+        case 'P2PKH':
+            inputSize = P2PKH_IN_SIZE;
+            break;
+        case 'P2SH-P2WPKH':
+            inputSize = P2SH_P2WPKH_IN_SIZE;
+            inputWitnessSize = 107; // size(signature) + signature + size(pubkey) + pubkey
+            break;
+        case 'P2WPKH':
+            inputSize = P2WPKH_IN_SIZE;
+            inputWitnessSize = 107; // size(signature) + signature + size(pubkey) + pubkey
+            break;
+        case 'P2TR': // Only consider the cooperative taproot signing path; assume multisig is done via aggregate signatures
+            inputSize = P2TR_IN_SIZE;
+            inputWitnessSize = 65; // getSizeOfVarInt(schnorrSignature) + schnorrSignature;
+            break;
+        case 'P2SH':
+            redeemScriptSize =
+                1 + // OP_M
+                    pubkeysPerInput * (1 + PUBKEY_SIZE) + // OP_PUSH33 <pubkey>
+                    1 + // OP_N
+                    1; // OP_CHECKMULTISIG
+            scriptSigSize =
+                1 + // size(0)
+                    signaturesPerInput * (1 + SIGNATURE_SIZE) + // size(SIGNATURE_SIZE) + signature
+                    getSizeOfScriptLengthElement(redeemScriptSize) +
+                    redeemScriptSize;
+            inputSize = 32 + 4 + getSizeOfVarInt(scriptSigSize) + scriptSigSize + 4;
+            break;
+        case 'P2SH-P2WSH':
+            break;
+        case 'P2WSH':
+            redeemScriptSize =
+                1 + // OP_M
+                    pubkeysPerInput * (1 + PUBKEY_SIZE) + // OP_PUSH33 <pubkey>
+                    1 + // OP_N
+                    1; // OP_CHECKMULTISIG
+            inputWitnessSize =
+                1 + // size(0)
+                    signaturesPerInput * (1 + SIGNATURE_SIZE) + // size(SIGNATURE_SIZE) + signature
+                    getSizeOfScriptLengthElement(redeemScriptSize) +
+                    redeemScriptSize;
+            inputSize =
+                36 + // outpoint (spent UTXO ID)
+                    inputWitnessSize / 4 + // witness program
+                    4; // nSequence
+            if (inputScript === 'P2SH-P2WSH') {
+                inputSize += 32 + 3; // P2SH wrapper (redeemscript hash) + overhead?
+            }
+            break;
+        default:
+            return undefined;
+    }
+    let txVBytes = getTxOverheadVBytes(inputScript, inputCount, output_count) +
+        inputSize * inputCount +
+        P2PKH_OUT_SIZE * p2pkhOutputCount +
+        P2SH_OUT_SIZE * p2shOutputCount +
+        P2SH_P2WPKH_OUT_SIZE * p2shP2wpkhOutputCount +
+        P2SH_P2WSH_OUT_SIZE * p2shP2wshOutputCount +
+        P2WPKH_OUT_SIZE * p2wpkhOutputCount +
+        P2WSH_OUT_SIZE * p2wshOutputCount +
+        P2TR_OUT_SIZE * p2trOutputCount;
+    let txBytes = getTxOverheadExtraRawBytes(inputScript, inputCount) +
+        txVBytes +
+        (inputWitnessSize * inputCount * 3) / 4;
+    let txWeight = txVBytes * 4;
+    return {
+        vBytes: txVBytes,
+        bytes: txBytes,
+        weight: txWeight,
+    };
+}
+
+// Source - https://github.com/OrdinalSafe/ordinalsafe-extension/blob/e26ac38ed8717d62714dd75e6ea573fbd58b14c2/src/pages/Popup/pages/Inscribe.jsx#L70
+const DUST_LIMIT = 546;
+const bip32 = BIP32Factory__default["default"](ecc__namespace);
+const splitByNChars = (str, n) => {
+    const result = [];
+    let i = 0;
+    const len = str.length;
+    while (i < len) {
+        result.push(str.substr(i, n));
+        i += n;
+    }
+    return result;
+};
+const generateRevealAddress = (xOnlyPubKey, mimeType, hexData, network) => {
+    let inscribeLockScript = bitcoin__namespace.script.fromASM(`${xOnlyPubKey.toString('hex')} OP_CHECKSIG OP_0 OP_IF ${Buffer.from('ord').toString('hex')} OP_1 ${Buffer.from(mimeType).toString('hex')} OP_0 ${splitByNChars(hexData, 1040).join(' ')} OP_ENDIF`);
+    inscribeLockScript = Buffer.from(inscribeLockScript.toString('hex').replace('6f726451', '6f72640101'), 'hex');
+    const scriptTree = {
+        output: inscribeLockScript,
+    };
+    const inscribeLockRedeem = {
+        output: inscribeLockScript,
+        redeemVersion: 192,
+    };
+    const inscribeP2tr = bitcoin__namespace.payments.p2tr({
+        internalPubkey: xOnlyPubKey,
+        scriptTree,
+        network,
+        redeem: inscribeLockRedeem,
+    });
+    const tapLeafScript = {
+        leafVersion: inscribeLockRedeem.redeemVersion,
+        script: inscribeLockRedeem.output || Buffer.from(''),
+        controlBlock: inscribeP2tr.witness[inscribeP2tr.witness.length - 1],
+    };
+    return {
+        p2tr: inscribeP2tr,
+        tapLeafScript,
+    };
+};
+const utxoToPSBTInput = (input, xOnlyPubKey) => {
+    return {
+        hash: input.txId,
+        index: input.index,
+        witnessUtxo: {
+            script: Buffer.from(input.script, 'hex'),
+            value: input.value,
+        },
+        tapInternalKey: xOnlyPubKey,
+    };
+};
+const getInscribeCommitTx = (inputs, committerAddress, revealerAddress, revealCost, change, xOnlyPubKey, serviceFee, serviceFeeReceiver, network) => {
+    if (inputs.length === 0)
+        throw new Error('Not enough funds');
+    let outputs = [
+        {
+            address: revealerAddress,
+            value: revealCost,
+        },
+    ];
+    if (change !== 0) {
+        outputs.push({
+            address: committerAddress,
+            value: change,
+        });
+    }
+    if (serviceFee > 0) {
+        outputs.push({
+            value: serviceFee,
+            address: serviceFeeReceiver,
+        });
+    }
+    const psbt = new bitcoin__namespace.Psbt({ network });
+    inputs.forEach((input) => {
+        psbt.addInput(utxoToPSBTInput(input, xOnlyPubKey));
+    });
+    outputs.forEach((output) => {
+        psbt.addOutput(output);
+    });
+    return psbt;
+};
+const signPSBTFromWallet = (signer, psbt) => {
+    bitcoin.initEccLib(ecc__namespace);
+    try {
+        psbt.signAllInputs(signer);
+        //psbt.validateSignaturesOfAllInputs(signer)
+    }
+    catch (error) {
+        console.log(error, 'signPSBTFromWallet error');
+    }
+    psbt.finalizeAllInputs();
+    return psbt.extractTransaction();
+};
+const getInscribeRevealTx = (commitHash, commitIndex, revealCost, postageSize, receiverAddress, inscriberOutputScript, xOnlyPubKey, tapLeafScript, websiteFeeReceiver = null, websiteFeeInSats = null, network) => {
+    const psbt = new bitcoin__namespace.Psbt({ network });
+    psbt.addInput({
+        hash: commitHash,
+        index: commitIndex,
+        witnessUtxo: {
+            script: inscriberOutputScript || Buffer.from(''),
+            value: revealCost,
+        },
+        tapInternalKey: xOnlyPubKey,
+        tapLeafScript: [tapLeafScript],
+    });
+    psbt.addOutput({
+        address: receiverAddress,
+        value: postageSize,
+    });
+    if (websiteFeeReceiver && websiteFeeInSats) {
+        psbt.addOutput({
+            address: websiteFeeReceiver,
+            value: websiteFeeInSats,
+        });
+    }
+    return psbt;
+};
+const generateTaprootSigner = (node) => {
+    const xOnlyPubKey = node.publicKey.slice(1, 33);
+    const signer = node.tweak(bitcoin__namespace.crypto.taggedHash('TapTweak', xOnlyPubKey));
+    return signer;
+};
+const generateAddress = (masterNode, path = 0, isTestNet) => {
+    const derived = isTestNet
+        ? masterNode.derivePath(`m/86'/1'/0'/0/${path}`)
+        : masterNode.derivePath(`m/86'/0'/0'/0/${path}`);
+    return derived;
+};
+const getWalletNode = (senderMnemonic, isTestNet) => {
+    const network = isTestNet ? bitcoin__namespace.networks.testnet : bitcoin__namespace.networks.bitcoin;
+    const seed = bip39.mnemonicToSeedSync(senderMnemonic);
+    const masterNode = bip32.fromSeed(seed, network);
+    const address = generateAddress(masterNode, 0, isTestNet);
+    const decoded = wif__default["default"].decode(address.toWIF(), address.network.wif);
+    return bip32.fromPrivateKey(decoded.privateKey, address.chainCode, network);
+};
+const chooseUTXOs = (utxos, amount) => {
+    const lessers = utxos.filter((utxo) => utxo.value < amount);
+    const greaters = utxos.filter((utxo) => utxo.value >= amount);
+    if (greaters.length > 0) {
+        let min;
+        let minUTXO;
+        for (const utxo of greaters) {
+            if (!min || utxo.value < min) {
+                min = utxo.value;
+                minUTXO = utxo;
+            }
+        }
+        if (minUTXO) {
+            const change = minUTXO.value - amount;
+            return { chosenUTXOs: [minUTXO], change };
+        }
+        else {
+            return { chosenUTXOs: [], change: 0 };
+        }
+    }
+    else {
+        lessers.sort((a, b) => b.value - a.value);
+        let sum = 0;
+        const chosen = [];
+        for (const utxo of lessers) {
+            if (utxo.value < DUST_LIMIT)
+                throw new Error('Amount requires usage of dust UTXOs. Set smaller amount');
+            sum += utxo.value;
+            chosen.push(utxo);
+            if (sum >= amount)
+                break;
+        }
+        if (sum < amount)
+            return { chosenUTXOs: [], change: 0 };
+        const change = sum - amount;
+        return { chosenUTXOs: chosen, change };
+    }
+};
+const getOutputAddressTypeCounts = (addresses, network) => {
+    let p2pkh = 0;
+    let p2sh = 0;
+    let p2wpkh = 0;
+    let p2wsh = 0;
+    let p2tr = 0;
+    if (JSON.stringify(network) === JSON.stringify(bitcoin__namespace.networks.testnet)) {
+        addresses.forEach((address) => {
+            if (address.startsWith('tb1p'))
+                p2tr++;
+            else if (address.startsWith('3'))
+                p2sh++;
+            else if (address.startsWith('1'))
+                p2pkh++;
+            else if (address.startsWith('tb1q')) {
+                let decodeBech32 = bitcoin__namespace.address.fromBech32(address);
+                if (decodeBech32.data.length === 20)
+                    p2wpkh++;
+                if (decodeBech32.data.length === 32)
+                    p2wsh++;
+            }
+            else {
+                p2tr++; // if dont know type assum taproot bc it has the highset size for outputs
+            }
+        });
+    }
+    else {
+        addresses.forEach((address) => {
+            if (address.startsWith('bc1p'))
+                p2tr++;
+            else if (address.startsWith('3'))
+                p2sh++;
+            else if (address.startsWith('1'))
+                p2pkh++;
+            else if (address.startsWith('bc1q')) {
+                let decodeBech32 = bitcoin__namespace.address.fromBech32(address);
+                if (decodeBech32.data.length === 20)
+                    p2wpkh++;
+                if (decodeBech32.data.length === 32)
+                    p2wsh++;
+            }
+            else {
+                p2tr++; // if dont know type assum taproot bc it has the highset size for outputs
+            }
+        });
+    }
+    return { p2pkh, p2sh, p2wpkh, p2wsh, p2tr };
+};
+const getInscribeTxsInfo = (utxos, data, sender, feeRate, serviceFee, serviceFeeReceiver, // to use in outputs size calculation
+btcPrice, // in USD
+websiteFeeInSats, network) => {
+    const POSTAGE_SIZE = 546;
+    // 1 input 1 output taproot tx size 111 vBytes
+    // some safety buffer + data size / 4
+    const hexData = Buffer.from(data);
+    const REVEAL_TX_SIZE = (websiteFeeInSats ? 180 : 137) + hexData.length / 4;
+    const SERVICE_FEE = Math.ceil((serviceFee / btcPrice) * 100000000);
+    const REVEAL_COST = POSTAGE_SIZE + (websiteFeeInSats || 0) + Math.ceil(REVEAL_TX_SIZE * feeRate);
+    let chosenUTXOs = [];
+    let change;
+    let knownSize = 0;
+    let newSize = 0;
+    do {
+        knownSize = newSize;
+        ({ chosenUTXOs, change } = chooseUTXOs(utxos, REVEAL_COST + SERVICE_FEE + Math.ceil(knownSize * feeRate)));
+        if (chosenUTXOs.length === 0)
+            throw new Error('Not enough funds');
+        const addresses = [];
+        if (change !== 0)
+            addresses.push(sender);
+        if (SERVICE_FEE !== 0)
+            addresses.push(serviceFeeReceiver);
+        const outputAddressTypeCounts = getOutputAddressTypeCounts(addresses, network);
+        newSize = Math.ceil(getTxSize(chosenUTXOs.length, 'P2TR', 1, 1, outputAddressTypeCounts.p2pkh, outputAddressTypeCounts.p2sh, 0, 0, outputAddressTypeCounts.p2wpkh, outputAddressTypeCounts.p2wsh, outputAddressTypeCounts.p2tr + 1 // +1 for reveal address
+        ).vBytes);
+    } while (knownSize !== newSize);
+    const COMMIT_TX_SIZE = knownSize;
+    const COMMIT_COST = REVEAL_COST + SERVICE_FEE + Math.ceil(COMMIT_TX_SIZE * feeRate);
+    return {
+        chosenUTXOs,
+        change,
+        commitCost: COMMIT_COST,
+        commitSize: COMMIT_TX_SIZE,
+        revealCost: REVEAL_COST,
+        revealSize: REVEAL_TX_SIZE,
+        serviceFee: SERVICE_FEE,
+        postageSize: POSTAGE_SIZE,
+    };
+};
+const btc_inscribe = async (senderMnemonic, mimeType, data, websiteFeeReceiver, websiteFeeInSats, inscriptionReceiver, chosenUTXOs, committerAddress, revealCost, change, serviceFee, network, postageSize, isTestNet) => {
+    try {
+        setBTCNetwork(isTestNet ? NetworkType.Testnet : NetworkType.Mainnet);
+        const walletNode = getWalletNode(senderMnemonic, isTestNet);
+        const signer = generateTaprootSigner(walletNode);
+        const senderPrivateKey = await mnemonicToTaprootPrivateKey(senderMnemonic, isTestNet);
+        const { keyPair } = generateTaprootKeyPair(senderPrivateKey);
+        const internalPubKey = toXOnly(keyPair.publicKey);
+        const hexData = Buffer.from(data).toString('hex');
+        const { p2tr: revealAddress, tapLeafScript } = generateRevealAddress(Buffer.from(internalPubKey), mimeType, hexData, exports.Network);
+        const commitPSBT = getInscribeCommitTx(chosenUTXOs, committerAddress, revealAddress.address, revealCost, change, Buffer.from(internalPubKey), serviceFee.feeAmount, serviceFee.feeReceiver, network);
+        const commitTx = signPSBTFromWallet(signer, commitPSBT);
+        const revealPSBT = getInscribeRevealTx(commitTx.getHash(), 0, revealCost, postageSize, inscriptionReceiver, revealAddress.output, revealAddress.internalPubkey, tapLeafScript, websiteFeeReceiver, websiteFeeInSats, exports.Network);
+        const revealTx = signPSBTFromWallet(walletNode, revealPSBT);
+        return {
+            commit: commitTx.getId(),
+            commitHex: commitTx.toHex(),
+            revealHex: revealTx.toHex(),
+            reveal: revealTx.getId(),
+        };
+    }
+    catch (error) {
+        console.log(error);
+        throw error;
+    }
+};
+
 function isPrivateKey(privateKey) {
     let isValid = false;
     try {
@@ -5172,25 +5660,6 @@ class Validator {
     }
 }
 
-const getRevealVirtualSizeByDataSize = (dataSize) => {
-    const inputSize = InputSize + dataSize;
-    return inputSize + OutputSize;
-};
-/**
-* estimateInscribeFee estimate BTC amount need to inscribe for creating project.
-* NOTE: Currently, the function only supports sending from Taproot address.
-* @param htmlFileSizeByte size of html file from user (in byte)
-* @param feeRatePerByte fee rate per byte (in satoshi)
-* @returns the total BTC fee
-*/
-const estimateInscribeFee = ({ htmlFileSizeByte, feeRatePerByte, }) => {
-    const estCommitTxFee = estimateTxFee(1, 2, feeRatePerByte);
-    const revealVByte = getRevealVirtualSizeByDataSize((htmlFileSizeByte + 24000) / 4); // 24k for contract size
-    const estRevealTxFee = revealVByte * feeRatePerByte;
-    const totalFee = estCommitTxFee + estRevealTxFee;
-    return { totalFee: new BigNumber(totalFee) };
-};
-
 exports.BNZero = BNZero;
 exports.BTCAddressType = BTCAddressType;
 exports.BlockStreamURL = BlockStreamURL;
@@ -5210,6 +5679,8 @@ exports.TESTNET_DERIV_PATH = TESTNET_DERIV_PATH;
 exports.Validator = Validator;
 exports.WalletType = WalletType;
 exports.broadcastTx = broadcastTx;
+exports.btc_inscribe = btc_inscribe;
+exports.chooseUTXOs = chooseUTXOs;
 exports.convertPrivateKey = convertPrivateKey;
 exports.convertPrivateKeyFromStr = convertPrivateKeyFromStr;
 exports.createDummyUTXOFromCardinal = createDummyUTXOFromCardinal;
@@ -5228,21 +5699,27 @@ exports.createTxSplitFundFromOrdinalUTXO = createTxSplitFundFromOrdinalUTXO;
 exports.createTxWithSpecificUTXOs = createTxWithSpecificUTXOs;
 exports.decryptWallet = decryptWallet;
 exports.encryptWallet = encryptWallet;
-exports.estimateInscribeFee = estimateInscribeFee;
 exports.estimateNumInOutputs = estimateNumInOutputs;
 exports.estimateNumInOutputsForBuyInscription = estimateNumInOutputsForBuyInscription;
 exports.estimateTxFee = estimateTxFee;
 exports.filterAndSortCardinalUTXOs = filterAndSortCardinalUTXOs;
 exports.findExactValueUTXO = findExactValueUTXO;
 exports.fromSat = fromSat;
+exports.generateAddress = generateAddress;
 exports.generateP2PKHKeyFromRoot = generateP2PKHKeyFromRoot;
 exports.generateP2PKHKeyPair = generateP2PKHKeyPair;
+exports.generateRevealAddress = generateRevealAddress;
 exports.generateTaprootAddress = generateTaprootAddress;
 exports.generateTaprootAddressFromPubKey = generateTaprootAddressFromPubKey;
 exports.generateTaprootKeyPair = generateTaprootKeyPair;
+exports.generateTaprootSigner = generateTaprootSigner;
 exports.getBTCBalance = getBTCBalance;
 exports.getBitcoinKeySignContent = getBitcoinKeySignContent;
+exports.getInscribeCommitTx = getInscribeCommitTx;
+exports.getInscribeRevealTx = getInscribeRevealTx;
+exports.getInscribeTxsInfo = getInscribeTxsInfo;
 exports.getKeyPairInfo = getKeyPairInfo;
+exports.getWalletNode = getWalletNode;
 exports.importBTCPrivateKey = importBTCPrivateKey;
 exports.mnemonicToTaprootPrivateKey = mnemonicToTaprootPrivateKey;
 exports.prepareUTXOsToBuyMultiInscriptions = prepareUTXOsToBuyMultiInscriptions;
@@ -5257,6 +5734,8 @@ exports.selectUTXOsToCreateBuyTx = selectUTXOsToCreateBuyTx;
 exports.setBTCNetwork = setBTCNetwork;
 exports.signPSBT = signPSBT;
 exports.signPSBT2 = signPSBT2;
+exports.signPSBTFromWallet = signPSBTFromWallet;
+exports.splitByNChars = splitByNChars;
 exports.tapTweakHash = tapTweakHash;
 exports.toXOnly = toXOnly;
 exports.tweakSigner = tweakSigner;
