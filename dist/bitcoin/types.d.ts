@@ -1,5 +1,5 @@
-import { Psbt, Transaction } from "bitcoinjs-lib";
-import BigNumber from "bignumber.js";
+import { Psbt, Transaction } from 'bitcoinjs-lib';
+import BigNumber from 'bignumber.js';
 interface UTXO {
     tx_hash: string;
     tx_output_n: number;
@@ -75,4 +75,33 @@ interface NeedPaymentUTXO {
     buyInfoIndex: number;
     amount: BigNumber;
 }
-export { UTXO, Inscription, ICreateTxResp, ICreateRawTxResp, ICreateTxSplitInscriptionResp, ICreateTxBuyResp, ICreateTxSellResp, BuyReqInfo, PaymentInfo, BuyReqFullInfo, Wallet, ISignPSBTResp, NeedPaymentUTXO, };
+interface SafeCardinalUTXO {
+    status: string;
+    txId: string;
+    index: number;
+    value: number;
+    script: string;
+    address: string;
+    blockHeight: number;
+    type: string;
+}
+interface SafeInscription {
+    id: string;
+    genesisFee: number;
+    genesisHeight: number;
+    number: number;
+    satpoint: string;
+    timestamp: number;
+}
+interface SafeOrdinalUTXO {
+    status: string;
+    txId: string;
+    index: number;
+    value: number;
+    script: string;
+    address: string;
+    blockHeight: number;
+    type: string;
+    inscriptions: Array<SafeInscription>;
+}
+export { UTXO, Inscription, ICreateTxResp, ICreateRawTxResp, ICreateTxSplitInscriptionResp, ICreateTxBuyResp, ICreateTxSellResp, BuyReqInfo, PaymentInfo, BuyReqFullInfo, Wallet, ISignPSBTResp, NeedPaymentUTXO, SafeCardinalUTXO, SafeInscription, SafeOrdinalUTXO };

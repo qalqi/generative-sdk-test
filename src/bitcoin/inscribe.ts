@@ -9,6 +9,8 @@ import {
   mnemonicToTaprootPrivateKey,
   setBTCNetwork,
   toXOnly,
+  SafeCardinalUTXO,
+  SafeOrdinalUTXO,
 } from '.';
 import * as ecc from '@bitcoinerlab/secp256k1';
 import { mnemonicToSeedSync } from 'bip39';
@@ -32,36 +34,6 @@ export const splitByNChars = (str: string, n: number): string[] => {
   return result;
 };
 
-export interface SafeCardinalUTXO {
-  status: string; // for now always mined
-  txId: string;
-  index: number;
-  value: number;
-  script: string;
-  address: string;
-  blockHeight: number;
-  type: string;
-}
-
-export interface SafeInscription {
-  id: string;
-  genesisFee: number;
-  genesisHeight: number;
-  number: number;
-  satpoint: string;
-  timestamp: number;
-}
-export interface SafeOrdinalUTXO {
-  status: string; // for now always mined
-  txId: string;
-  index: number;
-  value: number;
-  script: string;
-  address: string;
-  blockHeight: number;
-  type: string;
-  inscriptions: Array<SafeInscription>;
-}
 
 export const generateRevealAddress = (
   xOnlyPubKey: Buffer,

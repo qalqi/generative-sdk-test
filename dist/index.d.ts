@@ -92,6 +92,35 @@ interface NeedPaymentUTXO {
     buyInfoIndex: number;
     amount: BigNumber;
 }
+interface SafeCardinalUTXO {
+    status: string;
+    txId: string;
+    index: number;
+    value: number;
+    script: string;
+    address: string;
+    blockHeight: number;
+    type: string;
+}
+interface SafeInscription {
+    id: string;
+    genesisFee: number;
+    genesisHeight: number;
+    number: number;
+    satpoint: string;
+    timestamp: number;
+}
+interface SafeOrdinalUTXO {
+    status: string;
+    txId: string;
+    index: number;
+    value: number;
+    script: string;
+    address: string;
+    blockHeight: number;
+    type: string;
+    inscriptions: Array<SafeInscription>;
+}
 
 /**
 * selectUTXOs selects the most reasonable UTXOs to create the transaction.
@@ -751,35 +780,6 @@ declare const MAINNET_DERIV_PATH = "m/86'/0'/0'/0/0";
 declare const mnemonicToTaprootPrivateKey: (mnemonic: string, testnet?: any) => Promise<Buffer>;
 
 declare const splitByNChars: (str: string, n: number) => string[];
-interface SafeCardinalUTXO {
-    status: string;
-    txId: string;
-    index: number;
-    value: number;
-    script: string;
-    address: string;
-    blockHeight: number;
-    type: string;
-}
-interface SafeInscription {
-    id: string;
-    genesisFee: number;
-    genesisHeight: number;
-    number: number;
-    satpoint: string;
-    timestamp: number;
-}
-interface SafeOrdinalUTXO {
-    status: string;
-    txId: string;
-    index: number;
-    value: number;
-    script: string;
-    address: string;
-    blockHeight: number;
-    type: string;
-    inscriptions: Array<SafeInscription>;
-}
 declare const generateRevealAddress: (xOnlyPubKey: Buffer, mimeType: string, hexData: string, network: bitcoin.Network) => {
     p2tr: bitcoin.Payment;
     tapLeafScript: {

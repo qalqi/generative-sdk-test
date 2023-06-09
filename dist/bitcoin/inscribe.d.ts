@@ -1,36 +1,7 @@
 import * as bitcoin from 'bitcoinjs-lib';
 import { BIP32Interface } from 'bip32';
-import { Network } from '.';
+import { Network, SafeCardinalUTXO } from '.';
 export declare const splitByNChars: (str: string, n: number) => string[];
-export interface SafeCardinalUTXO {
-    status: string;
-    txId: string;
-    index: number;
-    value: number;
-    script: string;
-    address: string;
-    blockHeight: number;
-    type: string;
-}
-export interface SafeInscription {
-    id: string;
-    genesisFee: number;
-    genesisHeight: number;
-    number: number;
-    satpoint: string;
-    timestamp: number;
-}
-export interface SafeOrdinalUTXO {
-    status: string;
-    txId: string;
-    index: number;
-    value: number;
-    script: string;
-    address: string;
-    blockHeight: number;
-    type: string;
-    inscriptions: Array<SafeInscription>;
-}
 export declare const generateRevealAddress: (xOnlyPubKey: Buffer, mimeType: string, hexData: string, network: bitcoin.Network) => {
     p2tr: bitcoin.Payment;
     tapLeafScript: {
