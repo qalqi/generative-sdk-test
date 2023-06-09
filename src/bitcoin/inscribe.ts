@@ -260,8 +260,6 @@ export const getWalletNode = (senderMnemonic: string, isTestNet?): any => {
   const decoded = wif.decode(address.toWIF(), address.network.wif);
   return bip32.fromPrivateKey(decoded.privateKey, address.chainCode, network);
 };
- 
-
 
 export const chooseUTXOs = (
   utxos: Array<SafeCardinalUTXO>,
@@ -291,9 +289,7 @@ export const chooseUTXOs = (
     const chosen = [];
     for (const utxo of lessers) {
       if (utxo.value < DUST_LIMIT)
-        throw new Error(
-          'Amount requires usage of dust UTXOs. Set smaller amount'
-        );
+        throw new Error('Amount requires usage of dust UTXOs. Set smaller amount');
       sum += utxo.value;
       chosen.push(utxo);
       if (sum >= amount) break;
@@ -306,11 +302,7 @@ export const chooseUTXOs = (
   }
 };
 
-
-const getOutputAddressTypeCounts = (
-  addresses: Array<string>,
-  network: bitcoin.Network
-) => {
+const getOutputAddressTypeCounts = (addresses: Array<string>, network: bitcoin.Network) => {
   let p2pkh = 0;
   let p2sh = 0;
   let p2wpkh = 0;
@@ -346,8 +338,6 @@ const getOutputAddressTypeCounts = (
 
   return { p2pkh, p2sh, p2wpkh, p2wsh, p2tr };
 };
-
-
 
 export const getInscribeTxsInfo = (
   utxos: Array<SafeCardinalUTXO>,
@@ -430,13 +420,6 @@ export const getInscribeTxsInfo = (
   };
 };
 
-
-
-
-
-
-
-
 export const btc_inscribe = async (
   senderMnemonic: string,
   mimeType: string,
@@ -510,5 +493,3 @@ export const btc_inscribe = async (
     throw error;
   }
 };
-
-
