@@ -10,7 +10,7 @@ import {
   setBTCNetwork,
   toXOnly,
 } from '.';
-import ecc from '@bitcoinerlab/secp256k1';
+import * as ecc from '@bitcoinerlab/secp256k1';
 import { mnemonicToSeedSync } from 'bip39';
 import wif from 'wif';
 import { getTxSize } from './sizeEstimate';

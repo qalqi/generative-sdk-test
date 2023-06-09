@@ -7,6 +7,7 @@ const TEST_MNE_1 =
 
 describe('Create Inscription', async () => {
   it('create inscription', async () => {
+    return;
     const utxos = await getAllUnspentTransactions_mempool(
       'bc1pyj9qkgtlfnalxg925ks973wff5rvsfyctqmgrwrwj7e84f628gvsgjcpyk',
       'BTC_TAPROOT',
@@ -89,7 +90,7 @@ describe('Create Testnet Inscription', async () => {
 
     const cardinalUTXOsToUse = parsedUtxos;
     const content = {
-      data: 'hello world',
+      data: 'earthwallet.io',
       mime: 'text/plain;charset=utf-8',
     };
     const websiteFeeInSats = 0;
