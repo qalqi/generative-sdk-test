@@ -31,3 +31,5 @@ yarn build
 ```bash
 npx ts-node src/foo.ts
 ```
+
+https://bitcoinops.org/en/tools/calc-size/

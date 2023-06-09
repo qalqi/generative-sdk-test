@@ -9,7 +9,18 @@ import { filterAndSortCardinalUTXOs, findExactValueUTXO, selectInscriptionUTXO, 
 
 import BigNumber from "bignumber.js";
 import { Network } from "./network";
-import { handleSignPsbtWithSpecificWallet } from "./xverse";
+import { ECPairInterface } from "ecpair";
+
+export const DefaultSequenceRBF = 4294967293;
+
+export interface IKeyPairInfo {
+    address: string,
+    addressType: number,
+    keyPair: ECPairInterface,
+    payment: payments.Payment,
+    signer: any,
+    sigHashTypeDefault: number,
+}
 
 /**
 * createTx creates the Bitcoin transaction (including sending inscriptions). 
@@ -417,79 +428,98 @@ const createRawTx = ({
     return { base64Psbt: psbt.toBase64(), fee: feeRes, changeAmount, selectedUTXOs, indicesToSign };
 };
 
+const generateP2WPKHKeyPairFromPubKey = (pubKey: Buffer) => {
+    // Generate an address from the tweaked public key
+    const p2wpkh = payments.p2wpkh({
+        pubkey: pubKey,
+        network: Network
+    });
+    const address = p2wpkh.address ? p2wpkh.address : "";
+    if (address === "") {
+        throw new Error("Can not get sender address from private key");
+    }
+
+    return { address, p2wpkh };
+};
+
+export const BTCAddressType = {
+    P2TR: 1,
+    P2WPKH: 2,
+};
 
 /**
-* createTxFromAnyWallet creates the raw Bitcoin transaction (including sending inscriptions), but don't sign tx. 
-* NOTE: Currently, the function only supports sending from Taproot address. 
-* @param pubKey buffer public key of the sender (It is the internal pubkey for Taproot address)
-* @param utxos list of utxos (include non-inscription and inscription utxos)
-* @param inscriptions list of inscription infos of the sender
-* @param sendInscriptionID id of inscription to send
-* @param receiverInsAddress the address of the inscription receiver
-* @param sendAmount satoshi amount need to send 
-* @param feeRatePerByte fee rate per byte (in satoshi)
-* @param isUseInscriptionPayFee flag defines using inscription coin to pay fee 
-* @returns the transaction id
-* @returns the hex signed transaction
-* @returns the network fee
+* getAddressType return the type of btc address. 
+* @param address Bitcoin address. Currently, only support Taproot and Segwit (P2WPKH)
+* @returns the address type
 */
-const createTxFromAnyWallet = async ({
+const getAddressType = ({
+    btcAddress,
     pubKey,
-    utxos,
-    inscriptions,
-    sendInscriptionID = "",
-    receiverInsAddress,
-    sendAmount,
-    feeRatePerByte,
-    isUseInscriptionPayFeeParam = true, // default is true,
-    walletType = Transaction.SIGHASH_DEFAULT,
-    cancelFn,
 }: {
-    pubKey: Buffer,
-    utxos: UTXO[],
-    inscriptions: { [key: string]: Inscription[] },
-    sendInscriptionID: string,
-    receiverInsAddress: string,
-    sendAmount: BigNumber,
-    feeRatePerByte: number,
-    isUseInscriptionPayFeeParam: boolean,
-    walletType?: number,
-    cancelFn: () => void
-}): Promise<ICreateTxResp> => {
+    btcAddress: string, pubKey: Buffer
+}): number => {
 
-    const { address } = generateTaprootAddressFromPubKey(pubKey);
-
-    const { base64Psbt, indicesToSign, selectedUTXOs, fee, changeAmount } = createRawTx({
-        pubKey,
-        utxos,
-        inscriptions,
-        sendInscriptionID,
-        receiverInsAddress,
-        sendAmount,
-        feeRatePerByte,
-        isUseInscriptionPayFeeParam,
-    });
-
-    // sign transaction 
-    const { base64SignedPsbt, msgTx, msgTxID, msgTxHex } = await handleSignPsbtWithSpecificWallet({
-        base64Psbt: base64Psbt,
-        indicesToSign: indicesToSign,
-        address: address,
-        isGetMsgTx: true,
-        walletType,
-        cancelFn
-    });
-
-
-    return {
-        tx: msgTx,
-        txID: msgTxID,
-        txHex: msgTxHex,
-        fee,
-        selectedUTXOs,
-        changeAmount,
-    };
+    const { address: taprootAddress } = generateTaprootAddressFromPubKey(toXOnly(pubKey));
+    const { address: p2wpkhAddress } = generateP2WPKHKeyPairFromPubKey(pubKey);
+    switch (btcAddress) {
+        case taprootAddress:
+            return BTCAddressType.P2TR;
+        case p2wpkhAddress:
+            return BTCAddressType.P2WPKH;
+        default:
+            throw console.log('error');
+    }
 };
+ 
+
+export const getKeyPairInfo = ({
+    privateKey, address,
+}: {
+    privateKey: Buffer, address: string
+}): IKeyPairInfo => {
+    // init key pair from senderPrivateKey
+    const keyPair = ECPair.fromPrivateKey(privateKey, { network: Network });
+
+    // get address type 
+    const addressType = getAddressType({ btcAddress: address, pubKey: keyPair.publicKey });
+
+    // get payment and signer for each address type
+    let payment: payments.Payment;
+    let signer: any;
+    let sigHashTypeDefault: number;
+
+    switch (addressType) {
+        case BTCAddressType.P2TR: {
+            // Tweak the original keypair
+            const tweakedSigner = tweakSigner(keyPair, { network: Network });
+            signer = tweakedSigner;
+            sigHashTypeDefault = Transaction.SIGHASH_DEFAULT;
+
+            // Generate an address from the tweaked public key
+            payment = payments.p2tr({
+                pubkey: toXOnly(tweakedSigner.publicKey),
+                network: Network
+            });
+            break;
+        }
+        case BTCAddressType.P2WPKH: {
+            signer = keyPair;
+            sigHashTypeDefault = Transaction.SIGHASH_ALL;
+
+            payment = payments.p2wpkh({
+                pubkey: keyPair.publicKey,
+                network: Network
+            });
+
+            break;
+        }
+        default:
+            throw new console.log('ERROR_CODE.INVALID_BTC_ADDRESS_TYPE');
+    }
+
+    return { address, addressType, keyPair, payment, signer, sigHashTypeDefault };
+};
+
 
 /**
 * createTx creates the Bitcoin transaction (including sending inscriptions). 
@@ -1198,7 +1228,6 @@ export {
     selectUTXOs,
     createTx,
     createRawTx,
-    createTxFromAnyWallet,
     broadcastTx,
     createTxWithSpecificUTXOs,
     createRawTxDummyUTXOForSale,
@@ -1212,4 +1241,40 @@ export {
     createRawTxToPrepareUTXOsToBuyMultiInscs,
     signPSBT,
     signPSBT2,
+};
+
+
+
+const addInputs = ({
+    psbt,
+    addressType,
+    inputs,
+    payment,
+    sequence,
+    keyPair,
+}: {
+    psbt: Psbt,
+    addressType: number,
+    inputs: UTXO[],
+    payment: payments.Payment,
+    sequence: number,
+    keyPair: ECPairInterface,
+
+}): Psbt => {
+    for (const input of inputs) {
+        const inputData: any = {
+            hash: input.tx_hash,
+            index: input.tx_output_n,
+            witnessUtxo: { value: input.value.toNumber(), script: payment.output as Buffer },
+            sequence,
+        };
+
+        if (addressType === BTCAddressType.P2TR) {
+            inputData.tapInternalKey = toXOnly(keyPair.publicKey);
+        }
+
+        psbt.addInput(inputData);
+    }
+
+    return psbt;
 };
