@@ -5316,6 +5316,7 @@ const splitByNChars = (str, n) => {
     return result;
 };
 const generateRevealAddress = (xOnlyPubKey, mimeType, hexData, network) => {
+    var _a;
     let inscribeLockScript = bitcoin__namespace.script.fromASM(`${xOnlyPubKey.toString('hex')} OP_CHECKSIG OP_0 OP_IF ${Buffer.from('ord').toString('hex')} OP_1 ${Buffer.from(mimeType).toString('hex')} OP_0 ${splitByNChars(hexData, 1040).join(' ')} OP_ENDIF`);
     inscribeLockScript = Buffer.from(inscribeLockScript.toString('hex').replace('6f726451', '6f72640101'), 'hex');
     const scriptTree = {
@@ -5334,7 +5335,7 @@ const generateRevealAddress = (xOnlyPubKey, mimeType, hexData, network) => {
     const tapLeafScript = {
         leafVersion: inscribeLockRedeem.redeemVersion,
         script: inscribeLockRedeem.output || Buffer.from(''),
-        controlBlock: inscribeP2tr.witness[inscribeP2tr.witness.length - 1],
+        controlBlock: inscribeP2tr.witness[((_a = inscribeP2tr.witness) === null || _a === void 0 ? void 0 : _a.length) - 1],
     };
     return {
         p2tr: inscribeP2tr,
