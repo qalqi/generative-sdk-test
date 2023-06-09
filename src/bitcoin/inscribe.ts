@@ -105,9 +105,9 @@ export const generateRevealAddress = (
   });
 
   const tapLeafScript = {
-    leafVersion: inscribeLockRedeem.redeemVersion!,
+    leafVersion: inscribeLockRedeem.redeemVersion,
     script: inscribeLockRedeem.output || Buffer.from(''),
-    controlBlock: inscribeP2tr.witness![inscribeP2tr.witness!.length - 1],
+    controlBlock: inscribeP2tr.witness[inscribeP2tr.witness?.length - 1],
   };
 
   return {
